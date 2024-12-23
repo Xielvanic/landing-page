@@ -7,47 +7,31 @@
     <title>Home Network Monitor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+        .device,
+        .service,
+        .virtual-machine {
+            padding: 10px;
+            margin: 10px;
+            display: inline-block;
+            text-align: center;
         }
         
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        
-        th {
-            background-color: #f2f2f2;
-            cursor: pointer;
-        }
-        
-        tr:nth-child(even) {
+        .device {
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
             background-color: #f9f9f9;
         }
         
-        tr:hover {
-            background-color: #ddd;
+        .service {
+            border: 2px dashed #2196F3;
+            border-radius: 50%;
+            background-color: #e3f2fd;
         }
         
-        .nested-table {
-            margin-top: 10px;
-            margin-left: 20px;
-            width: 95%;
-        }
-        
-        .nested-table th,
-        .nested-table td {
-            border: 1px solid #ccc;
-            padding: 5px;
-            text-align: left;
-        }
-        
-        .nested-table th {
-            background-color: #e2e2e2;
+        .virtual-machine {
+            border: 2px dotted #FF9800;
+            border-radius: 5px;
+            background-color: #fff3e0;
         }
         
         .status-indicator {
@@ -70,6 +54,17 @@
             background-color: transparent;
             border: 1px solid #ccc;
         }
+        
+        .toggle-form {
+            cursor: pointer;
+            font-size: 1.5em;
+            margin: 10px;
+        }
+        
+        .add-device-form {
+            display: none;
+            margin-top: 20px;
+        }
     </style>
 </head>
 
@@ -79,135 +74,119 @@
     </header>
     <main>
         <h2>Devices</h2>
-        <table id="deviceTable">
-            <thead>
-                <tr>
-                    <th>IP Address</th>
-                    <th>Note</th>
-                    <th>Hostname</th>
-                    <th>Type</th>
-                    <th>OS</th>
-                    <th>Hosted On</th>
-                    <th>Last Ping Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in items %}
-                <tr>
-                    <td>
-                        <span class="status-indicator {% if item.last_ping_status == 'Reachable' %}status-reachable{% elif item.last_ping_status == 'Unreachable' %}status-unreachable{% else %}status-unknown{% endif %}"></span> {{ item.ip_address }}
-                    </td>
-                    <td>{{ item.note }}</td>
-                    <td>{{ item.hostname }}</td>
-                    <td>{{ item.type }}</td>
-                    <td>{{ item.os }}</td>
-                    <td>{{ item.hosted_on }}</td>
-                    <td>{{ item.last_ping_status or 'N/A' }}</td>
-                    <td>
-                        <button onclick="toggleEditForm('{{ item.id }}')">Edit</button>
-                        <button onclick="pingDevice('{{ item.id }}')">Ping</button>
-                        <form action="{{ url_for('delete_item', item_id=item.id) }}" method="post" style="display:inline;">
-                            <button type="submit">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                <tr id="edit-form-{{ item.id }}" style="display:none;">
-                    <td colspan="7">
-                        <form action="{{ url_for('edit_item_details', item_id=item.id) }}" method="post">
-                            <input type="text" name="ip_address" value="{{ item.ip_address }}" required>
-                            <input type="text" name="note" value="{{ item.note }}" required>
-                            <input type="text" name="hostname" value="{{ item.hostname }}" required>
-                            <select name="type" required>
-                                <option value="network" {% if item.type == 'network' %}selected{% endif %}>Network</option>
-                                <option value="physical" {% if item.type == 'physical' %}selected{% endif %}>Physical</option>
-                                <option value="service" {% if item.type == 'service' %}selected{% endif %}>Service</option>
-                                <option value="virtual" {% if item.type == 'virtual' %}selected{% endif %}>Virtual</option>
-                            </select>
-                            <input type="text" name="os" value="{{ item.os }}" required>
-                            <select name="hosted_on" required>
-                                <option value="NA" {% if item.hosted_on == 'NA' %}selected{% endif %}>NA</option>
-                                {% for host in physical_hosts %}
-                                <option value="{{ host.hostname }}" {% if item.hosted_on == host.hostname %}selected{% endif %}>{{ host.hostname }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit">Save</button>
-                        </form>
-                    </td>
-                </tr>
+        <div class="network-chart">
+            {% for item in items %} {% if item.type != 'virtual' %}
+            <div class="device">
+                <div>
+                    <span class="status-indicator {% if item.last_ping_status == 'Reachable' %}status-reachable{% elif item.last_ping_status == 'Unreachable' %}status-unreachable{% else %}status-unknown{% endif %}"></span> {{ item.ip_address }} - {{ item.hostname
+                    }}
+                </div>
+                <div>{{ item.note or '' }}</div>
+                <div>{{ item.type }}</div>
+                <div>{{ item.os or '' }}</div>
+                <div>{{ item.last_ping_status or 'N/A' }}</div>
+                <div>
+                    <button onclick="toggleEditForm('{{ item.id }}')">Edit</button>
+                    <button onclick="pingDevice('{{ item.id }}')">Ping</button>
+                    <button onclick="tracerouteDevice('{{ item.id }}')">Traceroute</button>
+                    <button onclick="sshIntoDevice('{{ item.id }}')">SSH</button>
+                    <form action="{{ url_for('delete_item', item_id=item.id) }}" method="post" style="display:inline;">
+                        <button type="submit">Delete</button>
+                    </form>
+                </div>
+                <div id="edit-form-{{ item.id }}" style="display:none;">
+                    <form action="{{ url_for('edit_item', item_id=item.id) }}" method="post">
+                        <input type="text" name="ip_address" value="{{ item.ip_address }}" required>
+                        <input type="text" name="note" value="{{ item.note }}">
+                        <input type="text" name="hostname" value="{{ item.hostname }}" required>
+                        <select name="type" required>
+                            <option value="network" {% if item.type == 'network' %}selected{% endif %}>Network</option>
+                            <option value="physical" {% if item.type == 'physical' %}selected{% endif %}>Physical</option>
+                            <option value="router" {% if item.type == 'router' %}selected{% endif %}>Router</option>
+                            <option value="switch" {% if item.type == 'switch' %}selected{% endif %}>Switch</option>
+                            <option value="service" {% if item.type == 'service' %}selected{% endif %}>Service</option>
+                            <option value="virtual" {% if item.type == 'virtual' %}selected{% endif %}>Virtual</option>
+                        </select>
+                        <input type="text" name="os" value="{{ item.os }}">
+                        <input type="text" name="username" value="{{ item.username }}">
+                        <input type="password" name="password" value="{{ item.password }}">
+                        <button type="submit">Save</button>
+                    </form>
+                </div>
                 {% if item.services %}
-                <tr>
-                    <td colspan="8">
-                        <table class="nested-table">
-                            <thead>
-                                <tr>
-                                    <th>Service URL</th>
-                                    <th>Port</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for service in item.services %}
-                                <tr>
-                                    <td>
-                                        <span class="status-indicator {% if service.reachable %}status-reachable{% elif service.reachable is not none %}status-unreachable{% else %}status-unknown{% endif %}"></span>
-                                        <a href="http://{{ service.url }}:{{ service.port }}" target="_blank">http://{{ service.url }}:{{ service.port }}</a>
-                                    </td>
-                                    <td>{{ service.port }}</td>
-                                    <td>
-                                        <form action="{{ url_for('delete_service', item_id=item.id, service_index=loop.index0) }}" method="post" style="display:inline;">
-                                            <button type="submit">Delete</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                                <tr>
-                                    <td colspan="3">
-                                        <form action="{{ url_for('add_service', item_id=item.id) }}" method="post">
-                                            <input type="url" name="url" placeholder="Service URL" required>
-                                            <input type="number" name="port" placeholder="Port" required>
-                                            <button type="submit">Add Service</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endif %} {% endfor %}
-            </tbody>
-        </table>
-
-        <h2>Add New Device</h2>
-        <form action="{{ url_for('add_item') }}" method="post">
-            <input type="text" name="ip_address" placeholder="IP Address" required>
-            <input type="text" name="note" placeholder="Note" required>
-            <input type="text" name="hostname" placeholder="Hostname" required>
-            <select name="type" required>
-                <option value="network">Network</option>
-                <option value="physical">Physical</option>
-                <option value="service">Service</option>
-                <option value="virtual">Virtual</option>
-            </select>
-            <input type="text" name="os" placeholder="OS" required>
-            <select name="hosted_on" required>
-                <option value="NA">NA</option>
-                {% for host in physical_hosts %}
-                <option value="{{ host.hostname }}">{{ host.hostname }}</option>
+                <div>
+                    {% for service in item.services %}
+                    <div class="service">
+                        <span class="status-indicator {% if service.reachable %}status-reachable{% elif service.reachable is not none %}status-unreachable{% else %}status-unknown{% endif %}"></span>
+                        <a href="http://{{ service.url }}:{{ service.port }}" target="_blank">http://{{ service.url }}:{{ service.port }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %} {% for vm in items if vm.type == 'virtual' and vm.hosted_on == item.hostname %}
+                <div class="virtual-machine">
+                    <div>
+                        <span class="status-indicator {% if vm.last_ping_status == 'Reachable' %}status-reachable{% elif vm.last_ping_status == 'Unreachable' %}status-unreachable{% else %}status-unknown{% endif %}"></span> {{ vm.ip_address }} - {{ vm.hostname
+                        }}
+                    </div>
+                    {% if vm.services %}
+                    <div>
+                        {% for service in vm.services %}
+                        <div class="service">
+                            <span class="status-indicator {% if service.reachable %}status-reachable{% elif service.reachable is not none %}status-unreachable{% else %}status-unknown{% endif %}"></span>
+                            <a href="http://{{ service.url }}:{{ service.port }}" target="_blank">http://{{ service.url }}:{{ service.port }}</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
                 {% endfor %}
-            </select>
-            <button type="submit">Add Device</button>
-        </form>
+            </div>
+            {% endif %} {% endfor %}
+        </div>
+
+        <h2>
+            <span class="toggle-form" onclick="toggleAddDeviceForm()">&#x2795;</span> Add New Device
+        </h2>
+        <div class="add-device-form" id="addDeviceForm">
+            <form action="{{ url_for('add_item') }}" method="post">
+                <input type="text" name="ip_address" placeholder="IP Address" required>
+                <input type="text" name="note" placeholder="Note (e.g., NICs: 2)">
+                <input type="text" name="hostname" placeholder="Hostname" required>
+                <select name="type" required>
+                    <option value="network">Network</option>
+                    <option value="physical">Physical</option>
+                    <option value="router">Router</option>
+                    <option value="switch">Switch</option>
+                    <option value="service">Service</option>
+                    <option value="virtual">Virtual</option>
+                </select>
+                <input type="text" name="os" placeholder="OS">
+                <input type="text" name="username" placeholder="Username">
+                <input type="password" name="password" placeholder="Password">
+                <select name="hosted_on">
+                    <option value="NA">NA</option>
+                    {% for host in physical_hosts %}
+                    <option value="{{ host.hostname }}">{{ host.hostname }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Add Device</button>
+            </form>
+        </div>
     </main>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
         function toggleEditForm(itemId) {
             const form = document.getElementById(`edit-form-${itemId}`);
             if (form) {
-                form.style.display = form.style.display === 'none' ? 'table-row' : 'none';
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
             } else {
                 console.error(`Edit form with ID edit-form-${itemId} not found.`);
             }
+        }
+
+        function toggleAddDeviceForm() {
+            const form = document.getElementById('addDeviceForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
         }
 
         function sortTable(columnIndex) {
@@ -273,6 +252,32 @@
                     }
                 })
                 .catch(error => console.error('Error pinging device:', error));
+        }
+
+        function tracerouteDevice(itemId) {
+            fetch(`/traceroute_device/${itemId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert(`Traceroute completed: ${data.result}`);
+                    } else {
+                        console.error('Traceroute failed:', data.message);
+                    }
+                })
+                .catch(error => console.error('Error performing traceroute:', error));
+        }
+
+        function sshIntoDevice(itemId) {
+            fetch(`/ssh_device/${itemId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert(`SSH connection successful. Output: ${data.output}`);
+                    } else {
+                        console.error('SSH failed:', data.message);
+                    }
+                })
+                .catch(error => console.error('Error SSHing into device:', error));
         }
     </script>
 </body>

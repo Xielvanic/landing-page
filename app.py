@@ -6,6 +6,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import platform
 from datetime import datetime
+import paramiko  # Add paramiko for SSH
+import uuid
 
 # Set the working directory
 WORKING_DIR = os.getenv('WORKING_DIR', os.path.dirname(os.path.abspath(__file__)))
@@ -63,6 +65,16 @@ def ping_device(ip_address):
         print(f"Ping failed for {ip_address}: {e.output}")
         return False
 
+def traceroute(ip_address):
+    param = '-n' if platform.system().lower() == 'windows' else '-q'
+    command = ['tracert' if platform.system().lower() == 'windows' else 'traceroute', ip_address]
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, universal_newlines=True)
+        return output
+    except subprocess.CalledProcessError as e:
+        print(f"Traceroute failed for {ip_address}: {e.output}")
+        return None
+
 # Function to setup logging for a device
 def setup_device_logger(device_id):
     logger = logging.getLogger(f'device_{device_id}')
@@ -84,14 +96,16 @@ def index():
 def add_item():
     items = load_items()
     new_item = {
-        'id': str(len(items) + 1),
+        'id': str(uuid.uuid4()),
         'ip_address': request.form['ip_address'],
-        'note': request.form['note'],
+        'note': request.form.get('note', ''),
         'hostname': request.form['hostname'],
         'type': request.form['type'],
-        'os': request.form['os'],
-        'hosted_on': request.form.get('hosted_on', 'NA'),
-        'services': []
+        'os': request.form.get('os', ''),
+        'username': request.form.get('username', ''),
+        'password': request.form.get('password', ''),
+        'last_ping_status': 'Unknown',
+        'hosted_on': request.form.get('hosted_on', 'NA')
     }
     items.append(new_item)
     save_items(items)
@@ -104,8 +118,8 @@ def delete_item(item_id):
     save_items(items)
     return redirect(url_for('index'))
 
-@app.route('/edit_item_details/<item_id>', methods=['POST'])
-def edit_item_details(item_id):
+@app.route('/edit_item/<item_id>', methods=['POST'])
+def edit_item(item_id):
     items = load_items()
     for item in items:
         if item['id'] == item_id:
@@ -114,7 +128,8 @@ def edit_item_details(item_id):
             item['hostname'] = request.form['hostname']
             item['type'] = request.form['type']
             item['os'] = request.form['os']
-            item['hosted_on'] = request.form.get('hosted_on', 'NA')
+            item['username'] = request.form.get('username', item.get('username'))
+            item['password'] = request.form.get('password', item.get('password'))
             break
     save_items(items)
     return redirect(url_for('index'))
@@ -163,10 +178,69 @@ def ping_device_route(item_id):
             item['last_ping_status'] = 'Reachable' if is_reachable else 'Unreachable'
             item['last_ping_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
+            # Log the updated time for debugging
+            print(f"Updated last_ping_time for {item_id}: {item['last_ping_time']}")
+            
             # Save the updated items
             save_items(items)
             
             return jsonify({'status': 'success', 'reachable': is_reachable})
+    return jsonify({'status': 'error', 'message': 'Device not found'})
+
+@app.route('/traceroute_device/<item_id>', methods=['GET'])
+def traceroute_device_route(item_id):
+    items = load_items()
+    for item in items:
+        if item['id'] == item_id:
+            result = traceroute(item['ip_address'])
+            if result:
+                # Parse traceroute output to find new devices
+                new_devices = parse_traceroute(result, items)
+                return jsonify({'status': 'success', 'result': result, 'new_devices': new_devices})
+            else:
+                return jsonify({'status': 'error', 'message': 'Traceroute failed'})
+    return jsonify({'status': 'error', 'message': 'Device not found'})
+
+def parse_traceroute(output, existing_items):
+    new_devices = []
+    lines = output.splitlines()
+    for line in lines:
+        # Extract IP addresses from traceroute output
+        if '(' in line and ')' in line:
+            ip_address = line.split('(')[1].split(')')[0]
+            if not any(item['ip_address'] == ip_address for item in existing_items):
+                new_devices.append(ip_address)
+    return new_devices
+
+def ssh_into_device(ip_address, username, password):
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(ip_address, username=username, password=password)
+        stdin, stdout, stderr = client.exec_command('esxcli vm process list')
+        output = stdout.read().decode()
+        client.close()
+        return output
+    except Exception as e:
+        print(f"SSH connection failed: {e}")
+        return None
+
+@app.route('/ssh_device/<item_id>', methods=['GET'])
+def ssh_device_route(item_id):
+    items = load_items()
+    for item in items:
+        if item['id'] == item_id:
+            username = item.get('username')
+            password = item.get('password')
+            if not username or not password:
+                return jsonify({'status': 'error', 'message': 'Credentials required'})
+            
+            output = ssh_into_device(item['ip_address'], username, password)
+            if output:
+                # Process output to extract VM information
+                return jsonify({'status': 'success', 'output': output})
+            else:
+                return jsonify({'status': 'error', 'message': 'SSH failed'})
     return jsonify({'status': 'error', 'message': 'Device not found'})
 
 if __name__ == '__main__':
