@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles.css">
+    <title>SSH Chat Interface</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        
+        #chat-container {
+            background-color: #333;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .chat-bubble {
+            background-color: #444;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 5px 0;
+            max-width: 80%;
+            white-space: pre-wrap;
+            overflow: hidden;
+        }
+        
+        .user-bubble {
+            background-color: #555;
+            align-self: flex-end;
+        }
+        
+        .machine-bubble {
+            background-color: #666;
+            align-self: flex-start;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        input[type="password"],
+        input[type="text"] {
+            margin-top: 10px;
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            width: calc(100% - 20px);
+        }
+        
+        button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background-color: #444;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #555;
+        }
+        
+        #error-log {
+            margin-top: 20px;
+            background-color: #222;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #connection-log {
+            margin-top: 20px;
+            background-color: #222;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>SSH Chat Interface for {{ item.hostname }}</h1>
+    <p>IP Address: {{ item.ip_address }}</p>
+    <p>Note: {{ item.note }}</p>
+    <p>OS: {{ item.os }}</p>
+    <p>Username: {{ item.username }}</p>
+    <div id="chat-container" style="display: flex; flex-direction: column;"></div>
+    <input type="password" id="password" placeholder="Enter SSH password">
+    <button id="connect-button" onclick="connectSSH()">Connect</button>
+    <input type="text" id="command-input" placeholder="Type your command here" style="display: none;">
+    <button id="send-button" onclick="sendCommand()" style="display: none;">Send Command</button>
+
+    <div id="service-form">
+        <h2>Add Service</h2>
+        <input type="text" id="service-url" placeholder="Service URL">
+        <input type="text" id="service-port" placeholder="Port (optional)">
+        <button onclick="addService()">Add Service</button>
+    </div>
+
+    <div id="services-list">
+        <h2>Services</h2>
+        <ul id="services"></ul>
+    </div>
+
+    <div id="error-log">
+        <h2>Error Log</h2>
+        <pre id="error-content"></pre>
+    </div>
+    <div id="connection-log">
+        <h2>Connection Log</h2>
+        <pre id="connection-content"></pre>
+    </div>
+    <script>
+        function addChatBubble(text, isUser = false) {
+            const chatContainer = document.getElementById('chat-container');
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble' + (isUser ? ' user-bubble' : ' machine-bubble');
+            bubble.textContent = text;
+            chatContainer.appendChild(bubble);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function connectSSH() {
+            const password = document.getElementById('password').value;
+            addChatBubble('Connecting...', true);
+
+            fetch(`/ssh_connect/{{ item.id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to connect');
+                    }
+                    return response.text();
+                })
+                .then(output => {
+                    addChatBubble('Connection successful!');
+                    addChatBubble(output);
+                    document.getElementById('connect-button').style.display = 'none';
+                    document.getElementById('password').style.display = 'none';
+                    document.getElementById('command-input').style.display = 'block';
+                    document.getElementById('send-button').style.display = 'block';
+                    loadConnectionLog();
+                })
+                .catch(error => {
+                    addChatBubble(`Error: ${error.message}`);
+                    loadErrorLog();
+                });
+        }
+
+        function sendCommand() {
+            const command = document.getElementById('command-input').value;
+            addChatBubble(command, true);
+            document.getElementById('command-input').value = '';
+
+            fetch(`/ssh_input/{{ item.id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        input: command
+                    })
+                })
+                .then(response => response.text())
+                .then(output => {
+                    addChatBubble(output);
+                })
+                .catch(error => {
+                    addChatBubble(`Error: ${error.message}`);
+                });
+        }
+
+        function addService() {
+            const url = document.getElementById('service-url').value;
+            const port = document.getElementById('service-port').value;
+            fetch(`/add_service/{{ item.id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        port: port
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(data.message);
+                        loadServices();
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                });
+        }
+
+        function loadServices() {
+            const servicesList = document.getElementById('services');
+            servicesList.innerHTML = ''; // Clear existing services
+            fetch(`/get_services/{{ item.id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(service => {
+                        const li = document.createElement('li');
+                        const link = document.createElement('a');
+                        link.href = service.port ? `${service.url}:${service.port}` : service.url;
+                        link.textContent = service.port ? `${service.url}:${service.port}` : service.url;
+                        link.target = '_blank'; // Open in new tab
+                        li.appendChild(link);
+                        servicesList.appendChild(li);
+                    });
+                });
+        }
+
+        function loadErrorLog() {
+            fetch('/static/ssh_errors.log')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('error-content').textContent = data;
+                });
+        }
+
+        function loadConnectionLog() {
+            fetch(`/static/server_logs/{{ item.id }}_ssh_events.log`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('connection-content').textContent = data;
+                });
+        }
+
+        // Load logs and services on page load
+        loadErrorLog();
+        loadConnectionLog();
+        loadServices();
+
+        // Handle Enter key for sending commands
+        document.getElementById('command-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendCommand();
+            }
+        });
+
+        // Handle Enter key for connecting
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                connectSSH();
+            }
+        });
+    </script>
+</body>
+
+</html>

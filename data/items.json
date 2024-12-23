@@ -1,0 +1,62 @@
+[
+    {
+        "id": "0cd1b770-3aa2-4037-af1f-73505b86d780",
+        "ip_address": "10.0.10.193",
+        "note": "amp control panel",
+        "hostname": "unsure",
+        "last_ping_status": "Success",
+        "type": "virtual",
+        "os": "ubuntu",
+        "hosted_on": "esx1",
+        "username": "eadmin",
+        "services": [
+            {
+                "url": "10.0.10.193",
+                "port": "8080"
+            }
+        ]
+    },
+    {
+        "id": "80cd74c9-d631-4072-a4bd-2c991e374210",
+        "ip_address": "10.0.10.1",
+        "note": "gateway",
+        "hostname": "unifi",
+        "last_ping_status": "Success",
+        "type": "network",
+        "services": [
+            {
+                "url": "10.0.10.1",
+                "port": "80"
+            }
+        ]
+    },
+    {
+        "id": "b30b37ec-137d-4821-88b8-1cd44d4f5a4d",
+        "ip_address": "10.0.10.111",
+        "note": "16 cores, 32 threads, 128 gigs of ram",
+        "hostname": "esx1",
+        "last_ping_status": "Success",
+        "type": "physical",
+        "os": "esx",
+        "services": [
+            {
+                "url": "esx1.emahiser.io",
+                "port": "80"
+            },
+            {
+                "url": "esx1.emahiser.io",
+                "port": "443"
+            }
+        ]
+    },
+    {
+        "id": "b1fbd420-75ab-4709-9946-d3b540f046ec",
+        "ip_address": "10.0.10.31",
+        "note": "truenas",
+        "hostname": "truenas",
+        "last_ping_status": "Success",
+        "type": "physical",
+        "os": "truenas",
+        "hosted_on": "NA"
+    }
+]

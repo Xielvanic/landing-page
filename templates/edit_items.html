@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Items</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <h1>Edit Items</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>IP Address</th>
+                <th>Note</th>
+                <th>Hostname</th>
+                <th>Type</th>
+                <th>OS</th>
+                <th>Hosted On</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.ip_address }}</td>
+                <td>{{ item.note }}</td>
+                <td>{{ item.hostname }}</td>
+                <td>{{ item.type }}</td>
+                <td>{{ item.os }}</td>
+                <td>{{ item.hosted_on }}</td>
+                <td>
+                    <form action="{{ url_for('delete_item', item_id=item.id) }}" method="post" style="display:inline;">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Add New Item</h2>
+    <form action="{{ url_for('edit_items') }}" method="post">
+        <input type="text" name="ip_address" placeholder="IP Address" required>
+        <input type="text" name="note" placeholder="Note" required>
+        <input type="text" name="hostname" placeholder="Hostname" required>
+        <select name="type" required>
+            <option value="network">Network</option>
+            <option value="physical">Physical</option>
+            <option value="service">Service</option>
+            <option value="virtual">Virtual</option>
+        </select>
+        <input type="text" name="os" placeholder="OS" required>
+        <input type="text" name="hosted_on" placeholder="Hosted On" value="NA">
+        <button type="submit">Add Item</button>
+    </form>
+</body>
+
+</html>
