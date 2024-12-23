@@ -49,6 +49,27 @@
         .nested-table th {
             background-color: #e2e2e2;
         }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-reachable {
+            background-color: green;
+        }
+        
+        .status-unreachable {
+            background-color: red;
+        }
+        
+        .status-unknown {
+            background-color: transparent;
+            border: 1px solid #ccc;
+        }
     </style>
 </head>
 
@@ -61,28 +82,28 @@
         <table id="deviceTable">
             <thead>
                 <tr>
-                    <th onclick="sortTable(0)">IP Address</th>
-                    <th onclick="sortTable(1)">Note</th>
-                    <th onclick="sortTable(2)">Hostname</th>
-                    <th onclick="sortTable(3)">Type</th>
-                    <th onclick="sortTable(4)">OS</th>
-                    <th onclick="sortTable(5)">Hosted On</th>
+                    <th>IP Address</th>
+                    <th>Note</th>
+                    <th>Hostname</th>
+                    <th>Type</th>
+                    <th>OS</th>
+                    <th>Hosted On</th>
                     <th>Last Ping Status</th>
-                    <th>Last Ping Time</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in items %}
                 <tr>
-                    <td>{{ item.ip_address }}</td>
+                    <td>
+                        <span class="status-indicator {% if item.last_ping_status == 'Reachable' %}status-reachable{% elif item.last_ping_status == 'Unreachable' %}status-unreachable{% else %}status-unknown{% endif %}"></span> {{ item.ip_address }}
+                    </td>
                     <td>{{ item.note }}</td>
                     <td>{{ item.hostname }}</td>
                     <td>{{ item.type }}</td>
                     <td>{{ item.os }}</td>
                     <td>{{ item.hosted_on }}</td>
                     <td>{{ item.last_ping_status or 'N/A' }}</td>
-                    <td>{{ item.last_ping_time or 'N/A' }}</td>
                     <td>
                         <button onclick="toggleEditForm('{{ item.id }}')">Edit</button>
                         <button onclick="pingDevice('{{ item.id }}')">Ping</button>
@@ -116,7 +137,7 @@
                 </tr>
                 {% if item.services %}
                 <tr>
-                    <td colspan="7">
+                    <td colspan="8">
                         <table class="nested-table">
                             <thead>
                                 <tr>
@@ -128,7 +149,10 @@
                             <tbody>
                                 {% for service in item.services %}
                                 <tr>
-                                    <td><a href="{{ service.url }}" target="_blank">{{ service.url }}</a></td>
+                                    <td>
+                                        <span class="status-indicator {% if service.reachable %}status-reachable{% elif service.reachable is not none %}status-unreachable{% else %}status-unknown{% endif %}"></span>
+                                        <a href="http://{{ service.url }}:{{ service.port }}" target="_blank">http://{{ service.url }}:{{ service.port }}</a>
+                                    </td>
                                     <td>{{ service.port }}</td>
                                     <td>
                                         <form action="{{ url_for('delete_service', item_id=item.id, service_index=loop.index0) }}" method="post" style="display:inline;">
