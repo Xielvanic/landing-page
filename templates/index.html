@@ -67,6 +67,8 @@
                     <th onclick="sortTable(3)">Type</th>
                     <th onclick="sortTable(4)">OS</th>
                     <th onclick="sortTable(5)">Hosted On</th>
+                    <th>Last Ping Status</th>
+                    <th>Last Ping Time</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -79,8 +81,11 @@
                     <td>{{ item.type }}</td>
                     <td>{{ item.os }}</td>
                     <td>{{ item.hosted_on }}</td>
+                    <td>{{ item.last_ping_status or 'N/A' }}</td>
+                    <td>{{ item.last_ping_time or 'N/A' }}</td>
                     <td>
                         <button onclick="toggleEditForm('{{ item.id }}')">Edit</button>
+                        <button onclick="pingDevice('{{ item.id }}')">Ping</button>
                         <form action="{{ url_for('delete_item', item_id=item.id) }}" method="post" style="display:inline;">
                             <button type="submit">Delete</button>
                         </form>
@@ -231,6 +236,19 @@
                     })
                     .catch(error => console.error('Error deleting item:', error));
             }
+        }
+
+        function pingDevice(itemId) {
+            fetch(`/ping_device/${itemId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert(`Device is ${data.reachable ? 'reachable' : 'unreachable'}.`);
+                    } else {
+                        console.error('Failed to ping device:', data.message);
+                    }
+                })
+                .catch(error => console.error('Error pinging device:', error));
         }
     </script>
 </body>
