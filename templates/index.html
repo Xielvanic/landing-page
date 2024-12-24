@@ -172,6 +172,21 @@
                 <button type="submit">Add Device</button>
             </form>
         </div>
+
+        <div class="relationships">
+            <h3>Relationships</h3>
+            <ul>
+                {% for item in items %}
+                <li>{{ item.hostname }} ({{ item.ip_address }}) hops through:
+                    <ul>
+                        {% for hop in item.relationships %}
+                        <li>{{ hop }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </main>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>

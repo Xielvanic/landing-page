@@ -24,6 +24,11 @@ LOG_DIR = os.getenv('LOG_DIR', os.path.join(WORKING_DIR, 'logs'))
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
+# Ensure items.json exists
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'w') as f:
+        json.dump([], f)
+
 # Helper functions
 def load_items():
     print(f"Attempting to load data from: {DATA_FILE}")
@@ -49,6 +54,8 @@ def save_items(items):
     try:
         with open(DATA_FILE, 'w') as f:
             json.dump(items, f, indent=4)
+    except PermissionError as e:
+        print(f"Permission error: {e}")
     except Exception as e:
         print(f"Error saving items: {e}")
 
@@ -194,23 +201,35 @@ def traceroute_device_route(item_id):
         if item['id'] == item_id:
             result = traceroute(item['ip_address'])
             if result:
-                # Parse traceroute output to find new devices
-                new_devices = parse_traceroute(result, items)
-                return jsonify({'status': 'success', 'result': result, 'new_devices': new_devices})
+                new_devices, relationships = parse_traceroute(result, items)
+                save_items(items)
+                return jsonify({'status': 'success', 'result': result, 'new_devices': new_devices, 'relationships': relationships})
             else:
                 return jsonify({'status': 'error', 'message': 'Traceroute failed'})
     return jsonify({'status': 'error', 'message': 'Device not found'})
 
 def parse_traceroute(output, existing_items):
     new_devices = []
+    relationships = []
     lines = output.splitlines()
     for line in lines:
-        # Extract IP addresses from traceroute output
         if '(' in line and ')' in line:
             ip_address = line.split('(')[1].split(')')[0]
             if not any(item['ip_address'] == ip_address for item in existing_items):
-                new_devices.append(ip_address)
-    return new_devices
+                new_device = {
+                    'id': str(uuid.uuid4()),
+                    'ip_address': ip_address,
+                    'note': 'Discovered via traceroute',
+                    'hostname': 'unknown',
+                    'last_ping_status': 'Unknown',
+                    'type': 'unknown',
+                    'os': 'unknown',
+                    'hosted_on': 'NA'
+                }
+                new_devices.append(new_device)
+                existing_items.append(new_device)
+            relationships.append(ip_address)
+    return new_devices, relationships
 
 def ssh_into_device(ip_address, username, password):
     try:
